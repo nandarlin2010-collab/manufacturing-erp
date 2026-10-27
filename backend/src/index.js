@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { initializeDatabase, getDashboardMetrics, getProducts, getInventory, getPurchaseOrders, getSalesOrders, getWorkOrders, createProduct, createSalesOrder, adjustInventory } from './db.js';
+import { initializeDatabase, getDashboardMetrics, getProducts, getInventory, getPurchaseOrders, getSalesOrders, getWorkOrders, createProduct, createSalesOrder, adjustInventory, getUserByEmail } from './db.js';
 
 dotenv.config();
 
@@ -11,11 +11,46 @@ const PORT = process.env.PORT || 4000;
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
 app.use(express.json());
 
+const requireAuth = (req, res, next) => {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+
+  if (!token || token !== 'demo-token-admin') {
+    return res.status(401).json({ error: 'Unauthorized. Log in first.' });
+  }
+
+  next();
+};
+
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'email and password are required' });
+  }
+
+  const user = await getUserByEmail(email);
+
+  if (!user || user.password !== password) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  res.json({
+    token: 'demo-token-admin',
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role
+    }
+  });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Manufacturing ERP API is running' });
 });
 
-app.get('/api/dashboard', async (req, res) => {
+app.get('/api/dashboard', requireAuth, async (req, res) => {
   try {
     const metrics = await getDashboardMetrics();
     res.json(metrics);
@@ -24,7 +59,7 @@ app.get('/api/dashboard', async (req, res) => {
   }
 });
 
-app.get('/api/products', async (req, res) => {
+app.get('/api/products', requireAuth, async (req, res) => {
   try {
     const products = await getProducts();
     res.json(products);
@@ -33,7 +68,7 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
-app.get('/api/inventory', async (req, res) => {
+app.get('/api/inventory', requireAuth, async (req, res) => {
   try {
     const inventory = await getInventory();
     res.json(inventory);
@@ -42,7 +77,7 @@ app.get('/api/inventory', async (req, res) => {
   }
 });
 
-app.get('/api/purchase-orders', async (req, res) => {
+app.get('/api/purchase-orders', requireAuth, async (req, res) => {
   try {
     const rows = await getPurchaseOrders();
     res.json(rows);
@@ -51,7 +86,7 @@ app.get('/api/purchase-orders', async (req, res) => {
   }
 });
 
-app.get('/api/sales-orders', async (req, res) => {
+app.get('/api/sales-orders', requireAuth, async (req, res) => {
   try {
     const rows = await getSalesOrders();
     res.json(rows);
@@ -60,7 +95,7 @@ app.get('/api/sales-orders', async (req, res) => {
   }
 });
 
-app.get('/api/work-orders', async (req, res) => {
+app.get('/api/work-orders', requireAuth, async (req, res) => {
   try {
     const rows = await getWorkOrders();
     res.json(rows);
@@ -69,7 +104,7 @@ app.get('/api/work-orders', async (req, res) => {
   }
 });
 
-app.post('/api/products', async (req, res) => {
+app.post('/api/products', requireAuth, async (req, res) => {
   try {
     const { name, sku, category, unit_price, reorder_level } = req.body;
 
@@ -91,7 +126,7 @@ app.post('/api/products', async (req, res) => {
   }
 });
 
-app.post('/api/sales-orders', async (req, res) => {
+app.post('/api/sales-orders', requireAuth, async (req, res) => {
   try {
     const { customer_name, product_id, quantity, total_amount } = req.body;
 
@@ -112,7 +147,7 @@ app.post('/api/sales-orders', async (req, res) => {
   }
 });
 
-app.post('/api/inventory/adjust', async (req, res) => {
+app.post('/api/inventory/adjust', requireAuth, async (req, res) => {
   try {
     const { product_id, quantity, location } = req.body;
 

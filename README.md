@@ -1,117 +1,239 @@
-# Manufacturing ERP Starter Project
+* {
+  box-sizing: border-box;
+}
 
-This repository contains a starter implementation for a manufacturing ERP platform with a simple full-stack setup:
+body {
+  margin: 0;
+  font-family: Inter, 'Segoe UI', sans-serif;
+  background: #f3f7fb;
+  color: #1d2433;
+}
 
-- Backend API built with Node.js + Express
-- SQLite database for MVP persistence
-- React frontend dashboard for operations overview
-- ERP modules scaffolded for inventory, purchasing, production, sales, and reporting
+button, input, select {
+  font: inherit;
+}
 
-## Project Structure
+#root {
+  width: 100%;
+}
 
-```bash
-.
-├── backend/
-│   ├── package.json
-│   ├── src/
-│   │   ├── db.js
-│   │   └── index.js
-│   └── .env.example
-├── frontend/
-│   ├── package.json
-│   ├── index.html
-│   └── src/
-│       ├── App.jsx
-│       ├── main.jsx
-│       └── styles.css
-├── ARCHITECTURE.md
-├── README.md
-├── .gitignore
-└── LICENSE
-```
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #eaf2ff, #f7fafe);
+  padding: 20px;
+}
 
-## Tech Stack
+.auth-card {
+  width: min(430px, 100%);
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 15px 40px rgba(17, 33, 80, 0.12);
+  padding: 32px 28px;
+}
 
-- Backend: Node.js, Express, SQLite
-- Frontend: React + Vite
-- API: REST endpoints
-- Database: SQLite for lightweight MVP storage
+.auth-card h1 {
+  margin-top: 10px;
+  margin-bottom: 22px;
+}
 
-## Quick Start
+.auth-form {
+  display: grid;
+  gap: 16px;
+}
 
-### 1) Install backend dependencies
+.auth-form label,
+.stack-form label {
+  display: grid;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #374151;
+}
 
-```bash
-cd backend
-npm install
-```
+input, select {
+  width: 100%;
+  border: 1px solid #d8e1ee;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
 
-### 2) Install frontend dependencies
+button {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  background: #2d5bff;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
 
-```bash
-cd ../frontend
-npm install
-```
+button:hover {
+  opacity: 0.96;
+}
 
-### 3) Start backend
+.demo-box {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #edf4ff;
+  color: #244299;
+  font-size: 0.9rem;
+}
 
-```bash
-cd backend
-npm run dev
-```
+.error-box {
+  margin-top: 16px;
+  background: #fff0f0;
+  border: 1px solid #ffd7d7;
+  color: #b42318;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
 
-Backend will run on:
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+}
 
-```bash
-http://localhost:4000
-```
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 24px;
+}
 
-### 4) Start frontend
+.eyebrow {
+  margin: 0;
+  color: #4f7cff;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
 
-```bash
-cd frontend
-npm run dev
-```
+h1 {
+  margin: 8px 0 0;
+  font-size: 2.2rem;
+}
 
-Frontend will run on:
+.logout-btn {
+  background: #0f172a;
+  padding-inline: 18px;
+}
 
-```bash
-http://localhost:5173
-```
+.tab-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0 24px;
+}
 
-## API Endpoints
+.tab {
+  background: #e8eefb;
+  color: #233a72;
+  font-weight: 700;
+}
 
-- GET /api/health
-- GET /api/dashboard
-- GET /api/products
-- GET /api/inventory
-- GET /api/purchase-orders
-- GET /api/sales-orders
-- GET /api/work-orders
-- POST /api/products
-- POST /api/sales-orders
-- POST /api/inventory/adjust
+.tab.active {
+  background: #2d5bff;
+  color: white;
+}
 
-## Starter Modules Included
+.stats-grid,
+.panel-grid,
+.table-section,
+.split-layout {
+  display: grid;
+  gap: 20px;
+}
 
-- Inventory management
-- Purchase orders
-- Production planning
-- Sales orders
-- Dashboard metrics
-- Reporting summary
+.stats-grid {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin-bottom: 24px;
+}
 
-## Next Enhancements
+.metric {
+  padding: 22px 18px;
+  background: linear-gradient(135deg, #1c2a6d, #2d5bff);
+  color: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(38, 66, 147, 0.2);
+}
 
-- Authentication and authorization
-- Supplier and customer CRUD
-- Work order approval workflows
-- Expense and accounting module
-- PDF invoice generation
-- Role-based dashboards
-- Charts and analytics
-- Deploy to Docker / Azure / Render
+.metric span {
+  display: block;
+  opacity: 0.9;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
 
-## Notes
+.metric strong {
+  font-size: 2rem;
+}
 
-This starter is designed to provide a clean foundation for a manufacturing ERP system and can be expanded into a full enterprise application over time.
+.card,
+.panel,
+.table-card {
+  background: white;
+  border: 1px solid #e4ebf5;
+  border-radius: 16px;
+  box-shadow: 0 10px 22px rgba(16, 32, 67, 0.04);
+}
+
+.panel, .table-card {
+  padding: 20px;
+}
+
+.panel-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  margin-bottom: 24px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid #edf2f7;
+  font-size: 0.95rem;
+}
+
+th {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.list li {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid #edf2f7;
+  padding-bottom: 8px;
+}
+
+.split-layout {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.stack-form {
+  display: grid;
+  gap: 14px;
+}
+
+.full-width {
+  width: 100%;
+}

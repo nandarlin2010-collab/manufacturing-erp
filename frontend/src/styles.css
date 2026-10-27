@@ -1,137 +1,472 @@
-* {
-  box-sizing: border-box;
+import { useEffect, useMemo, useState } from 'react';
+
+const API_URL = 'http://localhost:4000/api';
+
+const demoCredentials = {
+  email: 'admin@hnh.com',
+  password: 'admin123'
+};
+
+function App() {
+  const [token, setToken] = useState(localStorage.getItem('erp-token') || '');
+  const [loginData, setLoginData] = useState(demoCredentials);
+  const [loginError, setLoginError] = useState('');
+  const [dashboard, setDashboard] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [inventory, setInventory] = useState([]);
+  const [sales, setSales] = useState([]);
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [workOrders, setWorkOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [productForm, setProductForm] = useState({ name: '', sku: '', category: 'Raw Material', unit_price: '0', reorder_level: '5' });
+  const [salesForm, setSalesForm] = useState({ customer_name: '', product_id: '', quantity: '1', total_amount: '0' });
+
+  const authHeaders = useMemo(() => ({
+    'Content-Type': 'application/json',
+    Authorization: token ? `Bearer ${token}` : ''
+  }), [token]);
+
+  const fetchData = async () => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const [dashboardRes, productsRes, inventoryRes, salesRes, purchaseRes, workRes] = await Promise.all([
+        fetch(`${API_URL}/dashboard`, { headers: authHeaders }),
+        fetch(`${API_URL}/products`, { headers: authHeaders }),
+        fetch(`${API_URL}/inventory`, { headers: authHeaders }),
+        fetch(`${API_URL}/sales-orders`, { headers: authHeaders }),
+        fetch(`${API_URL}/purchase-orders`, { headers: authHeaders }),
+        fetch(`${API_URL}/work-orders`, { headers: authHeaders })
+      ]);
+
+      if (!dashboardRes.ok || !productsRes.ok || !inventoryRes.ok || !salesRes.ok || !purchaseRes.ok || !workRes.ok) {
+        throw new Error('Unauthorized or failed to fetch ERP data');
+      }
+
+      const dashboardData = await dashboardRes.json();
+      const productsData = await productsRes.json();
+      const inventoryData = await inventoryRes.json();
+      const salesData = await salesRes.json();
+      const purchaseData = await purchaseRes.json();
+      const workData = await workRes.json();
+
+      setDashboard(dashboardData);
+      setProducts(productsData);
+      setInventory(inventoryData);
+      setSales(salesData);
+      setPurchaseOrders(purchaseData);
+      setWorkOrders(workData);
+      setLoading(false);
+    } catch (error) {
+      console.error('Failed to load ERP data', error);
+      setLoginError('Session expired or API unavailable. Please log in again.');
+      setToken('');
+      localStorage.removeItem('erp-token');
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [token]);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(loginData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Login failed');
+      }
+
+      const result = await response.json();
+      setToken(result.token);
+      localStorage.setItem('erp-token', result.token);
+      setLoading(true);
+    } catch (error) {
+      setLoginError(error.message);
+    }
+  };
+
+  const handleLogout = () => {
+    setToken('');
+    localStorage.removeItem('erp-token');
+    setDashboard(null);
+  };
+
+  const handleProductSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      const response = await fetch(`${API_URL}/products`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          ...productForm,
+          unit_price: Number(productForm.unit_price),
+          reorder_level: Number(productForm.reorder_level)
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Unable to add product');
+      }
+
+      const newProduct = await response.json();
+      setProducts((prev) => [newProduct, ...prev]);
+      setProductForm({ name: '', sku: '', category: 'Raw Material', unit_price: '0', reorder_level: '5' });
+      setActiveTab('products');
+    } catch (error) {
+      setLoginError(error.message);
+    }
+  };
+
+  const handleSalesSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      const response = await fetch(`${API_URL}/sales-orders`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          customer_name: salesForm.customer_name,
+          product_id: salesForm.product_id,
+          quantity: Number(salesForm.quantity),
+          total_amount: Number(salesForm.total_amount)
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Unable to create sales order');
+      }
+
+      const newOrder = await response.json();
+      setSales((prev) => [newOrder, ...prev]);
+      setSalesForm({ customer_name: '', product_id: '', quantity: '1', total_amount: '0' });
+      setActiveTab('sales');
+    } catch (error) {
+      setLoginError(error.message);
+    }
+  };
+
+  if (!token) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <p className="eyebrow">Manufacturing ERP</p>
+          <h1>Sign in</h1>
+          <form onSubmit={handleLogin} className="auth-form">
+            <label>
+              Email
+              <input
+                type="email"
+                value={loginData.email}
+                onChange={(e) => setLoginData((prev) => ({ ...prev, email: e.target.value }))}
+              />
+            </label>
+            <label>
+              Password
+              <input
+                type="password"
+                value={loginData.password}
+                onChange={(e) => setLoginData((prev) => ({ ...prev, password: e.target.value }))}
+              />
+            </label>
+
+            <button type="submit">Login</button>
+          </form>
+
+          {loginError && <div className="error-box">{loginError}</div>}
+
+          <div className="demo-box">
+            Demo login: <strong>{demoCredentials.email}</strong> / <strong>{demoCredentials.password}</strong>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return <div className="page"><h2>Loading ERP dashboard...</h2></div>;
+  }
+
+  return (
+    <div className="page">
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">Operations Overview</p>
+          <h1>Manufacturing ERP</h1>
+        </div>
+        <button className="logout-btn" onClick={handleLogout}>Logout</button>
+      </header>
+
+      <nav className="tab-nav">
+        {['dashboard', 'products', 'inventory', 'sales', 'purchase', 'work'].map((tab) => (
+          <button
+            key={tab}
+            className={activeTab === tab ? 'tab active' : 'tab'}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+      </nav>
+
+      {activeTab === 'dashboard' && (
+        <>
+          <section className="stats-grid">
+            <div className="card metric">
+              <span>Products</span>
+              <strong>{dashboard?.summary?.totalProducts ?? 0}</strong>
+            </div>
+            <div className="card metric">
+              <span>Inventory Units</span>
+              <strong>{dashboard?.summary?.totalInventory ?? 0}</strong>
+            </div>
+            <div className="card metric">
+              <span>Pending Sales</span>
+              <strong>{dashboard?.summary?.pendingSales ?? 0}</strong>
+            </div>
+            <div className="card metric">
+              <span>Active Work Orders</span>
+              <strong>{dashboard?.summary?.activeWorkOrders ?? 0}</strong>
+            </div>
+          </section>
+
+          <section className="panel-grid">
+            <div className="panel">
+              <h3>Low Stock Alerts</h3>
+              <ul className="list">
+                {(dashboard?.lowStock ?? []).map((item) => (
+                  <li key={item.name}>
+                    <span>{item.name}</span>
+                    <strong>{item.quantity}</strong>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="panel">
+              <h3>Products</h3>
+              <ul className="list">
+                {products.slice(0, 5).map((product) => (
+                  <li key={product.id}>
+                    <span>{product.name}</span>
+                    <strong>{product.category}</strong>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        </>
+      )}
+
+      {activeTab === 'products' && (
+        <section className="split-layout">
+          <div className="panel">
+            <h3>Add Product</h3>
+            <form onSubmit={handleProductSubmit} className="stack-form">
+              <label>
+                Name
+                <input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} />
+              </label>
+              <label>
+                SKU
+                <input value={productForm.sku} onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })} />
+              </label>
+              <label>
+                Category
+                <select value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}>
+                  <option>Raw Material</option>
+                  <option>Component</option>
+                  <option>Assembly</option>
+                  <option>Electronics</option>
+                </select>
+              </label>
+              <label>
+                Unit Price
+                <input type="number" value={productForm.unit_price} onChange={(e) => setProductForm({ ...productForm, unit_price: e.target.value })} />
+              </label>
+              <label>
+                Reorder Level
+                <input type="number" value={productForm.reorder_level} onChange={(e) => setProductForm({ ...productForm, reorder_level: e.target.value })} />
+              </label>
+              <button type="submit">Save Product</button>
+            </form>
+          </div>
+
+          <div className="table-card">
+            <h3>Products</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>SKU</th>
+                  <th>Category</th>
+                  <th>Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((product) => (
+                  <tr key={product.id}>
+                    <td>{product.name}</td>
+                    <td>{product.sku}</td>
+                    <td>{product.category}</td>
+                    <td>${Number(product.unit_price).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {activeTab === 'inventory' && (
+        <div className="table-card full-width">
+          <h3>Inventory</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>SKU</th>
+                <th>Location</th>
+                <th>Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {inventory.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.name}</td>
+                  <td>{item.sku}</td>
+                  <td>{item.location}</td>
+                  <td>{item.quantity}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {activeTab === 'sales' && (
+        <section className="split-layout">
+          <div className="panel">
+            <h3>Create Sales Order</h3>
+            <form onSubmit={handleSalesSubmit} className="stack-form">
+              <label>
+                Customer
+                <input value={salesForm.customer_name} onChange={(e) => setSalesForm({ ...salesForm, customer_name: e.target.value })} />
+              </label>
+              <label>
+                Product
+                <select value={salesForm.product_id} onChange={(e) => setSalesForm({ ...salesForm, product_id: e.target.value })}>
+                  <option value="">Select product</option>
+                  {products.map((product) => (
+                    <option key={product.id} value={product.id}>{product.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Quantity
+                <input type="number" value={salesForm.quantity} onChange={(e) => setSalesForm({ ...salesForm, quantity: e.target.value })} />
+              </label>
+              <label>
+                Total Amount
+                <input type="number" value={salesForm.total_amount} onChange={(e) => setSalesForm({ ...salesForm, total_amount: e.target.value })} />
+              </label>
+              <button type="submit">Create Order</button>
+            </form>
+          </div>
+
+          <div className="table-card">
+            <h3>Sales Orders</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Product</th>
+                  <th>Qty</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sales.map((sale) => (
+                  <tr key={sale.id}>
+                    <td>{sale.customer_name}</td>
+                    <td>{sale.product_name}</td>
+                    <td>{sale.quantity}</td>
+                    <td>{sale.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {activeTab === 'purchase' && (
+        <div className="table-card full-width">
+          <h3>Purchase Orders</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Supplier</th>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {purchaseOrders.map((order) => (
+                <tr key={order.id}>
+                  <td>{order.supplier_name}</td>
+                  <td>{order.product_name}</td>
+                  <td>{order.quantity}</td>
+                  <td>{order.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {activeTab === 'work' && (
+        <div className="table-card full-width">
+          <h3>Work Orders</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Planned Qty</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {workOrders.map((order) => (
+                <tr key={order.id}>
+                  <td>{order.product_name}</td>
+                  <td>{order.planned_quantity}</td>
+                  <td>{order.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
 }
 
-body {
-  margin: 0;
-  font-family: Inter, 'Segoe UI', sans-serif;
-  background: #f3f7fb;
-  color: #1d2433;
-}
-
-button, input, select {
-  font: inherit;
-}
-
-#root {
-  width: 100%;
-}
-
-.page {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 32px 20px 48px;
-}
-
-.topbar {
-  margin-bottom: 24px;
-}
-
-.eyebrow {
-  margin: 0;
-  color: #4f7cff;
-  text-transform: uppercase;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  font-weight: 700;
-}
-
-h1 {
-  margin: 8px 0 0;
-  font-size: 2.2rem;
-}
-
-.stats-grid,
-.panel-grid,
-.table-section {
-  display: grid;
-  gap: 20px;
-}
-
-.stats-grid {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  margin-bottom: 24px;
-}
-
-.metric {
-  padding: 22px 18px;
-  background: linear-gradient(135deg, #1c2a6d, #2d5bff);
-  color: white;
-  border-radius: 16px;
-  box-shadow: 0 10px 25px rgba(38, 66, 147, 0.2);
-}
-
-.metric span {
-  display: block;
-  opacity: 0.9;
-  margin-bottom: 8px;
-  font-size: 0.9rem;
-}
-
-.metric strong {
-  font-size: 2rem;
-}
-
-.card,
-.panel,
-.table-card {
-  background: white;
-  border: 1px solid #e4ebf5;
-  border-radius: 16px;
-  box-shadow: 0 10px 22px rgba(16, 32, 67, 0.04);
-}
-
-.panel {
-  padding: 20px;
-}
-
-.panel-grid {
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  margin-bottom: 24px;
-}
-
-.table-section {
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  margin-bottom: 24px;
-}
-
-.table-card {
-  padding: 18px;
-}
-
-h3 {
-  margin-top: 0;
-  margin-bottom: 18px;
-}
-
-.list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 8px;
-}
-
-.list li {
-  display: flex;
-  justify-content: space-between;
-  border-bottom: 1px solid #edf2f7;
-  padding-bottom: 8px;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th, td {
-  text-align: left;
-  padding: 10px 8px;
-  border-bottom: 1px solid #edf2f7;
-  font-size: 0.95rem;
-}
-
-th {
-  color: #64748b;
-  font-weight: 600;
-}
+export default App;

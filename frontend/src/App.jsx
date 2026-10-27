@@ -1,202 +1,266 @@
-import { useEffect, useState } from 'react';
+import sqlite3 from 'sqlite3';
+import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
+import path from 'path';
 
-const API_URL = 'http://localhost:4000/api';
+const dbDir = path.join(process.cwd(), 'data');
+const dbPath = path.join(dbDir, 'erp.db');
 
-function App() {
-  const [dashboard, setDashboard] = useState(null);
-  const [products, setProducts] = useState([]);
-  const [inventory, setInventory] = useState([]);
-  const [sales, setSales] = useState([]);
-  const [purchaseOrders, setPurchaseOrders] = useState([]);
-  const [workOrders, setWorkOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [dashboardRes, productsRes, inventoryRes, salesRes, purchaseRes, workRes] = await Promise.all([
-          fetch(`${API_URL}/dashboard`),
-          fetch(`${API_URL}/products`),
-          fetch(`${API_URL}/inventory`),
-          fetch(`${API_URL}/sales-orders`),
-          fetch(`${API_URL}/purchase-orders`),
-          fetch(`${API_URL}/work-orders`)
-        ]);
-
-        const dashboardData = await dashboardRes.json();
-        const productsData = await productsRes.json();
-        const inventoryData = await inventoryRes.json();
-        const salesData = await salesRes.json();
-        const purchaseData = await purchaseRes.json();
-        const workData = await workRes.json();
-
-        setDashboard(dashboardData);
-        setProducts(productsData);
-        setInventory(inventoryData);
-        setSales(salesData);
-        setPurchaseOrders(purchaseData);
-        setWorkOrders(workData);
-      } catch (error) {
-        console.error('Failed to load ERP data', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  if (loading) {
-    return <div className="page"><h2>Loading ERP dashboard...</h2></div>;
-  }
-
-  return (
-    <div className="page">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Operations Overview</p>
-          <h1>Manufacturing ERP</h1>
-        </div>
-      </header>
-
-      <section className="stats-grid">
-        <div className="card metric">
-          <span>Products</span>
-          <strong>{dashboard?.summary?.totalProducts ?? 0}</strong>
-        </div>
-        <div className="card metric">
-          <span>Inventory Units</span>
-          <strong>{dashboard?.summary?.totalInventory ?? 0}</strong>
-        </div>
-        <div className="card metric">
-          <span>Pending Sales</span>
-          <strong>{dashboard?.summary?.pendingSales ?? 0}</strong>
-        </div>
-        <div className="card metric">
-          <span>Active Work Orders</span>
-          <strong>{dashboard?.summary?.activeWorkOrders ?? 0}</strong>
-        </div>
-      </section>
-
-      <section className="panel-grid">
-        <div className="panel">
-          <h3>Low Stock Alerts</h3>
-          <ul className="list">
-            {(dashboard?.lowStock ?? []).map((item) => (
-              <li key={item.name}>
-                <span>{item.name}</span>
-                <strong>{item.quantity}</strong>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="panel">
-          <h3>Products</h3>
-          <ul className="list">
-            {products.slice(0, 5).map((product) => (
-              <li key={product.id}>
-                <span>{product.name}</span>
-                <strong>{product.category}</strong>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      <section className="table-section">
-        <div className="table-card">
-          <h3>Inventory</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Location</th>
-                <th>Quantity</th>
-              </tr>
-            </thead>
-            <tbody>
-              {inventory.slice(0, 6).map((item) => (
-                <tr key={item.id}>
-                  <td>{item.name}</td>
-                  <td>{item.location}</td>
-                  <td>{item.quantity}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="table-card">
-          <h3>Sales Orders</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Customer</th>
-                <th>Product</th>
-                <th>Qty</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sales.slice(0, 6).map((sale) => (
-                <tr key={sale.id}>
-                  <td>{sale.customer_name}</td>
-                  <td>{sale.product_name}</td>
-                  <td>{sale.quantity}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="table-section">
-        <div className="table-card">
-          <h3>Purchase Orders</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Supplier</th>
-                <th>Product</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {purchaseOrders.slice(0, 6).map((order) => (
-                <tr key={order.id}>
-                  <td>{order.supplier_name}</td>
-                  <td>{order.product_name}</td>
-                  <td>{order.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="table-card">
-          <h3>Work Orders</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Planned Qty</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workOrders.slice(0, 6).map((order) => (
-                <tr key={order.id}>
-                  <td>{order.product_name}</td>
-                  <td>{order.planned_quantity}</td>
-                  <td>{order.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  );
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
 }
 
-export default App;
+const db = new sqlite3.Database(dbPath);
+
+const run = (sql, params = []) =>
+  new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+      if (err) return reject(err);
+      resolve({ id: this.lastID, changes: this.changes });
+    });
+  });
+
+const all = (sql, params = []) =>
+  new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) return reject(err);
+      resolve(rows);
+    });
+  });
+
+const getSingle = (sql, params = []) =>
+  new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => {
+      if (err) return reject(err);
+      resolve(row);
+    });
+  });
+
+export async function initializeDatabase() {
+  await run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      role TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS products (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      sku TEXT NOT NULL UNIQUE,
+      category TEXT NOT NULL,
+      unit_price REAL DEFAULT 0,
+      reorder_level INTEGER DEFAULT 5,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS inventory (
+      id TEXT PRIMARY KEY,
+      product_id TEXT NOT NULL,
+      quantity INTEGER NOT NULL,
+      location TEXT NOT NULL,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(product_id) REFERENCES products(id)
+    )
+  `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS purchase_orders (
+      id TEXT PRIMARY KEY,
+      supplier_name TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      quantity INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      order_date TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(product_id) REFERENCES products(id)
+    )
+  `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS sales_orders (
+      id TEXT PRIMARY KEY,
+      customer_name TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      quantity INTEGER NOT NULL,
+      total_amount REAL DEFAULT 0,
+      status TEXT NOT NULL,
+      order_date TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(product_id) REFERENCES products(id)
+    )
+  `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS work_orders (
+      id TEXT PRIMARY KEY,
+      product_id TEXT NOT NULL,
+      planned_quantity INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      due_date TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(product_id) REFERENCES products(id)
+    )
+  `);
+
+  const userCount = await getSingle('SELECT COUNT(*) as count FROM users');
+  if (!userCount || userCount.count === 0) {
+    await run(
+      `INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)`,
+      [uuidv4(), 'System Admin', 'admin@hnh.com', 'admin123', 'admin']
+    );
+  }
+
+  const productCount = await getSingle('SELECT COUNT(*) as count FROM products');
+  if (!productCount || productCount.count === 0) {
+    const sampleProducts = [
+      { name: 'Steel Rod', sku: 'MAT-STEEL-001', category: 'Raw Material', unit_price: 12.5, reorder_level: 40 },
+      { name: 'Hydraulic Pump', sku: 'COMP-PUMP-002', category: 'Component', unit_price: 340, reorder_level: 15 },
+      { name: 'Motor Assembly', sku: 'ASM-MOTOR-003', category: 'Assembly', unit_price: 980, reorder_level: 8 },
+      { name: 'Safety Sensor', sku: 'ELEC-SENSOR-004', category: 'Electronics', unit_price: 55, reorder_level: 25 }
+    ];
+
+    for (const product of sampleProducts) {
+      const id = uuidv4();
+      await run(
+        `INSERT INTO products (id, name, sku, category, unit_price, reorder_level) VALUES (?, ?, ?, ?, ?, ?)`,
+        [id, product.name, product.sku, product.category, product.unit_price, product.reorder_level]
+      );
+
+      await run(
+        `INSERT INTO inventory (id, product_id, quantity, location) VALUES (?, ?, ?, ?)`,
+        [uuidv4(), id, Math.floor(Math.random() * 80) + 20, 'Main Warehouse']
+      );
+
+      await run(
+        `INSERT INTO purchase_orders (id, supplier_name, product_id, quantity, status) VALUES (?, ?, ?, ?, ?)`,
+        [uuidv4(), 'North Supply Co.', id, 50, 'Approved']
+      );
+
+      await run(
+        `INSERT INTO sales_orders (id, customer_name, product_id, quantity, total_amount, status) VALUES (?, ?, ?, ?, ?, ?)`,
+        [uuidv4(), 'Alpha Manufacturing', id, 10, product.unit_price * 10, 'Pending']
+      );
+
+      await run(
+        `INSERT INTO work_orders (id, product_id, planned_quantity, status) VALUES (?, ?, ?, ?)`,
+        [uuidv4(), id, 25, 'Scheduled']
+      );
+    }
+  }
+}
+
+export async function getUserByEmail(email) {
+  return getSingle('SELECT * FROM users WHERE email = ?', [email]);
+}
+
+export async function getDashboardMetrics() {
+  const totalProducts = await getSingle('SELECT COUNT(*) as count FROM products');
+  const totalInventory = await getSingle('SELECT COALESCE(SUM(quantity), 0) as total FROM inventory');
+  const pendingSales = await getSingle('SELECT COALESCE(COUNT(*), 0) as count FROM sales_orders WHERE status = "Pending"');
+  const activeWorkOrders = await getSingle('SELECT COALESCE(COUNT(*), 0) as count FROM work_orders WHERE status != "Completed"');
+
+  const lowStock = await all(`
+    SELECT p.name, i.quantity, p.reorder_level
+    FROM inventory i
+    JOIN products p ON p.id = i.product_id
+    WHERE i.quantity <= p.reorder_level
+    ORDER BY i.quantity ASC
+    LIMIT 5
+  `);
+
+  return {
+    summary: {
+      totalProducts: totalProducts.count,
+      totalInventory: totalInventory.total,
+      pendingSales: pendingSales.count,
+      activeWorkOrders: activeWorkOrders.count,
+    },
+    lowStock
+  };
+}
+
+export async function getProducts() {
+  return all('SELECT * FROM products ORDER BY created_at DESC');
+}
+
+export async function getInventory() {
+  return all(`
+    SELECT i.id, i.quantity, i.location, i.updated_at, p.name, p.sku, p.category
+    FROM inventory i
+    JOIN products p ON p.id = i.product_id
+    ORDER BY i.updated_at DESC
+  `);
+}
+
+export async function getPurchaseOrders() {
+  return all(`
+    SELECT po.id, po.supplier_name, po.quantity, po.status, po.order_date, p.name as product_name
+    FROM purchase_orders po
+    JOIN products p ON p.id = po.product_id
+    ORDER BY po.order_date DESC
+  `);
+}
+
+export async function getSalesOrders() {
+  return all(`
+    SELECT so.id, so.customer_name, so.quantity, so.total_amount, so.status, so.order_date, p.name as product_name
+    FROM sales_orders so
+    JOIN products p ON p.id = so.product_id
+    ORDER BY so.order_date DESC
+  `);
+}
+
+export async function getWorkOrders() {
+  return all(`
+    SELECT wo.id, wo.planned_quantity, wo.status, wo.due_date, p.name as product_name
+    FROM work_orders wo
+    JOIN products p ON p.id = wo.product_id
+    ORDER BY wo.due_date DESC
+  `);
+}
+
+export async function createProduct({ name, sku, category, unit_price, reorder_level }) {
+  const id = uuidv4();
+  await run(
+    `INSERT INTO products (id, name, sku, category, unit_price, reorder_level) VALUES (?, ?, ?, ?, ?, ?)`,
+    [id, name, sku, category, Number(unit_price), Number(reorder_level)]
+  );
+
+  await run(
+    `INSERT INTO inventory (id, product_id, quantity, location) VALUES (?, ?, ?, ?)`,
+    [uuidv4(), id, 0, 'Main Warehouse']
+  );
+
+  return { id, name, sku, category, unit_price, reorder_level };
+}
+
+export async function createSalesOrder({ customer_name, product_id, quantity, total_amount }) {
+  const id = uuidv4();
+  await run(
+    `INSERT INTO sales_orders (id, customer_name, product_id, quantity, total_amount, status) VALUES (?, ?, ?, ?, ?, ?)`,
+    [id, customer_name, product_id, Number(quantity), Number(total_amount), 'Pending']
+  );
+  return { id, customer_name, product_id, quantity, total_amount, status: 'Pending' };
+}
+
+export async function adjustInventory({ product_id, quantity, location }) {
+  const existingRow = await getSingle(
+    `SELECT * FROM inventory WHERE product_id = ? AND location = ? ORDER BY updated_at DESC LIMIT 1`,
+    [product_id, location]
+  );
+
+  const nextQuantity = existingRow ? Number(existingRow.quantity) + Number(quantity) : Number(quantity);
+  const id = uuidv4();
+
+  await run(
+    `INSERT INTO inventory (id, product_id, quantity, location) VALUES (?, ?, ?, ?)`,
+    [id, product_id, nextQuantity, location]
+  );
+
+  return { id, product_id, quantity: nextQuantity, location };
+}
