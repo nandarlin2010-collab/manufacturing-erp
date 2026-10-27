@@ -1,715 +1,239 @@
-import { useEffect, useMemo, useState } from 'react';
-
-const API_URL = 'http://localhost:4000/api';
-
-const demoCredentials = {
-  email: 'admin@hnh.com',
-  password: 'admin123'
-};
-
-function App() {
-  const [token, setToken] = useState(localStorage.getItem('erp-token') || '');
-  const [loginData, setLoginData] = useState(demoCredentials);
-  const [loginError, setLoginError] = useState('');
-  const [dashboard, setDashboard] = useState(null);
-  const [products, setProducts] = useState([]);
-  const [inventory, setInventory] = useState([]);
-  const [sales, setSales] = useState([]);
-  const [purchaseOrders, setPurchaseOrders] = useState([]);
-  const [workOrders, setWorkOrders] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [productForm, setProductForm] = useState({ name: '', sku: '', category: 'Raw Material', unit_price: '0', reorder_level: '5' });
-  const [salesForm, setSalesForm] = useState({ customer_name: '', product_id: '', quantity: '1', total_amount: '0' });
-  const [supplierForm, setSupplierForm] = useState({ name: '', contact_name: '', email: '', phone: '' });
-  const [customerForm, setCustomerForm] = useState({ name: '', contact_name: '', email: '', phone: '' });
-  const [productionForm, setProductionForm] = useState({ product_id: '', planned_quantity: '10', status: 'Scheduled' });
-
-  const authHeaders = useMemo(() => ({
-    'Content-Type': 'application/json',
-    Authorization: token ? `Bearer ${token}` : ''
-  }), [token]);
-
-  const fetchData = async () => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const [dashboardRes, productsRes, inventoryRes, salesRes, purchaseRes, workRes, suppliersRes, customersRes] = await Promise.all([
-        fetch(`${API_URL}/dashboard`, { headers: authHeaders }),
-        fetch(`${API_URL}/products`, { headers: authHeaders }),
-        fetch(`${API_URL}/inventory`, { headers: authHeaders }),
-        fetch(`${API_URL}/sales-orders`, { headers: authHeaders }),
-        fetch(`${API_URL}/purchase-orders`, { headers: authHeaders }),
-        fetch(`${API_URL}/work-orders`, { headers: authHeaders }),
-        fetch(`${API_URL}/suppliers`, { headers: authHeaders }),
-        fetch(`${API_URL}/customers`, { headers: authHeaders })
-      ]);
-
-      if (!dashboardRes.ok || !productsRes.ok || !inventoryRes.ok || !salesRes.ok || !purchaseRes.ok || !workRes.ok || !suppliersRes.ok || !customersRes.ok) {
-        throw new Error('Unauthorized or failed to fetch ERP data');
-      }
-
-      const dashboardData = await dashboardRes.json();
-      const productsData = await productsRes.json();
-      const inventoryData = await inventoryRes.json();
-      const salesData = await salesRes.json();
-      const purchaseData = await purchaseRes.json();
-      const workData = await workRes.json();
-      const supplierData = await suppliersRes.json();
-      const customerData = await customersRes.json();
-
-      setDashboard(dashboardData);
-      setProducts(productsData);
-      setInventory(inventoryData);
-      setSales(salesData);
-      setPurchaseOrders(purchaseData);
-      setWorkOrders(workData);
-      setSuppliers(supplierData);
-      setCustomers(customerData);
-      setLoading(false);
-    } catch (error) {
-      console.error('Failed to load ERP data', error);
-      setLoginError('Session expired or API unavailable. Please log in again.');
-      setToken('');
-      localStorage.removeItem('erp-token');
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, [token]);
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoginError('');
-
-    try {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(loginData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Login failed');
-      }
-
-      const result = await response.json();
-      setToken(result.token);
-      localStorage.setItem('erp-token', result.token);
-      setLoading(true);
-    } catch (error) {
-      setLoginError(error.message);
-    }
-  };
-
-  const handleLogout = () => {
-    setToken('');
-    localStorage.removeItem('erp-token');
-    setDashboard(null);
-  };
-
-  const handleProductSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      const response = await fetch(`${API_URL}/products`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          ...productForm,
-          unit_price: Number(productForm.unit_price),
-          reorder_level: Number(productForm.reorder_level)
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Unable to add product');
-      }
-
-      const newProduct = await response.json();
-      setProducts((prev) => [newProduct, ...prev]);
-      setProductForm({ name: '', sku: '', category: 'Raw Material', unit_price: '0', reorder_level: '5' });
-      setActiveTab('products');
-    } catch (error) {
-      setLoginError(error.message);
-    }
-  };
-
-  const handleSupplierSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      const response = await fetch(`${API_URL}/suppliers`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify(supplierForm)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Unable to add supplier');
-      }
-
-      const newSupplier = await response.json();
-      setSuppliers((prev) => [newSupplier, ...prev]);
-      setSupplierForm({ name: '', contact_name: '', email: '', phone: '' });
-      setActiveTab('suppliers');
-    } catch (error) {
-      setLoginError(error.message);
-    }
-  };
-
-  const handleCustomerSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      const response = await fetch(`${API_URL}/customers`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify(customerForm)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Unable to add customer');
-      }
-
-      const newCustomer = await response.json();
-      setCustomers((prev) => [newCustomer, ...prev]);
-      setCustomerForm({ name: '', contact_name: '', email: '', phone: '' });
-      setActiveTab('customers');
-    } catch (error) {
-      setLoginError(error.message);
-    }
-  };
-
-  const handleSalesSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      const response = await fetch(`${API_URL}/sales-orders`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          customer_name: salesForm.customer_name,
-          product_id: salesForm.product_id,
-          quantity: Number(salesForm.quantity),
-          total_amount: Number(salesForm.total_amount)
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Unable to create sales order');
-      }
-
-      const newOrder = await response.json();
-      setSales((prev) => [newOrder, ...prev]);
-      setSalesForm({ customer_name: '', product_id: '', quantity: '1', total_amount: '0' });
-      setActiveTab('sales');
-    } catch (error) {
-      setLoginError(error.message);
-    }
-  };
-
-  const handleProductionSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      const response = await fetch(`${API_URL}/work-orders`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          product_id: productionForm.product_id,
-          planned_quantity: Number(productionForm.planned_quantity),
-          status: productionForm.status
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Unable to create work order');
-      }
-
-      const newWorkOrder = await response.json();
-      setWorkOrders((prev) => [newWorkOrder, ...prev]);
-      setProductionForm({ product_id: '', planned_quantity: '10', status: 'Scheduled' });
-      setActiveTab('production');
-    } catch (error) {
-      setLoginError(error.message);
-    }
-  };
-
-  if (!token) {
-    return (
-      <div className="auth-page">
-        <div className="auth-card">
-          <p className="eyebrow">Manufacturing ERP</p>
-          <h1>Sign in</h1>
-          <form onSubmit={handleLogin} className="auth-form">
-            <label>
-              Email
-              <input
-                type="email"
-                value={loginData.email}
-                onChange={(e) => setLoginData((prev) => ({ ...prev, email: e.target.value }))}
-              />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                value={loginData.password}
-                onChange={(e) => setLoginData((prev) => ({ ...prev, password: e.target.value }))}
-              />
-            </label>
-
-            <button type="submit">Login</button>
-          </form>
-
-          {loginError && <div className="error-box">{loginError}</div>}
-
-          <div className="demo-box">
-            Demo login: <strong>{demoCredentials.email}</strong> / <strong>{demoCredentials.password}</strong>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return <div className="page"><h2>Loading ERP dashboard...</h2></div>;
-  }
-
-  return (
-    <div className="page">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Operations Overview</p>
-          <h1>Manufacturing ERP</h1>
-        </div>
-        <button className="logout-btn" onClick={handleLogout}>Logout</button>
-      </header>
-
-      <nav className="tab-nav">
-        {['dashboard', 'products', 'inventory', 'sales', 'purchase', 'production', 'suppliers', 'customers', 'work'].map((tab) => (
-          <button
-            key={tab}
-            className={activeTab === tab ? 'tab active' : 'tab'}
-            onClick={() => setActiveTab(tab)}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
-      </nav>
-
-      {activeTab === 'dashboard' && (
-        <>
-          <section className="stats-grid">
-            <div className="card metric">
-              <span>Products</span>
-              <strong>{dashboard?.summary?.totalProducts ?? 0}</strong>
-            </div>
-            <div className="card metric">
-              <span>Inventory Units</span>
-              <strong>{dashboard?.summary?.totalInventory ?? 0}</strong>
-            </div>
-            <div className="card metric">
-              <span>Pending Sales</span>
-              <strong>{dashboard?.summary?.pendingSales ?? 0}</strong>
-            </div>
-            <div className="card metric">
-              <span>Active Work Orders</span>
-              <strong>{dashboard?.summary?.activeWorkOrders ?? 0}</strong>
-            </div>
-          </section>
-
-          <section className="panel-grid">
-            <div className="panel">
-              <h3>Low Stock Alerts</h3>
-              <ul className="list">
-                {(dashboard?.lowStock ?? []).map((item) => (
-                  <li key={item.name}>
-                    <span>{item.name}</span>
-                    <strong>{item.quantity}</strong>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="panel">
-              <h3>Products</h3>
-              <ul className="list">
-                {products.slice(0, 5).map((product) => (
-                  <li key={product.id}>
-                    <span>{product.name}</span>
-                    <strong>{product.category}</strong>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </section>
-        </>
-      )}
-
-      {activeTab === 'products' && (
-        <section className="split-layout">
-          <div className="panel">
-            <h3>Add Product</h3>
-            <form onSubmit={handleProductSubmit} className="stack-form">
-              <label>
-                Name
-                <input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} />
-              </label>
-              <label>
-                SKU
-                <input value={productForm.sku} onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })} />
-              </label>
-              <label>
-                Category
-                <select value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}>
-                  <option>Raw Material</option>
-                  <option>Component</option>
-                  <option>Assembly</option>
-                  <option>Electronics</option>
-                </select>
-              </label>
-              <label>
-                Unit Price
-                <input type="number" value={productForm.unit_price} onChange={(e) => setProductForm({ ...productForm, unit_price: e.target.value })} />
-              </label>
-              <label>
-                Reorder Level
-                <input type="number" value={productForm.reorder_level} onChange={(e) => setProductForm({ ...productForm, reorder_level: e.target.value })} />
-              </label>
-              <button type="submit">Save Product</button>
-            </form>
-          </div>
-
-          <div className="table-card">
-            <h3>Products</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>SKU</th>
-                  <th>Category</th>
-                  <th>Price</th>
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((product) => (
-                  <tr key={product.id}>
-                    <td>{product.name}</td>
-                    <td>{product.sku}</td>
-                    <td>{product.category}</td>
-                    <td>${Number(product.unit_price).toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'inventory' && (
-        <div className="table-card full-width">
-          <h3>Inventory</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>SKU</th>
-                <th>Location</th>
-                <th>Quantity</th>
-              </tr>
-            </thead>
-            <tbody>
-              {inventory.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.name}</td>
-                  <td>{item.sku}</td>
-                  <td>{item.location}</td>
-                  <td>{item.quantity}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {activeTab === 'sales' && (
-        <section className="split-layout">
-          <div className="panel">
-            <h3>Create Sales Order</h3>
-            <form onSubmit={handleSalesSubmit} className="stack-form">
-              <label>
-                Customer
-                <input value={salesForm.customer_name} onChange={(e) => setSalesForm({ ...salesForm, customer_name: e.target.value })} />
-              </label>
-              <label>
-                Product
-                <select value={salesForm.product_id} onChange={(e) => setSalesForm({ ...salesForm, product_id: e.target.value })}>
-                  <option value="">Select product</option>
-                  {products.map((product) => (
-                    <option key={product.id} value={product.id}>{product.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Quantity
-                <input type="number" value={salesForm.quantity} onChange={(e) => setSalesForm({ ...salesForm, quantity: e.target.value })} />
-              </label>
-              <label>
-                Total Amount
-                <input type="number" value={salesForm.total_amount} onChange={(e) => setSalesForm({ ...salesForm, total_amount: e.target.value })} />
-              </label>
-              <button type="submit">Create Order</button>
-            </form>
-          </div>
-
-          <div className="table-card">
-            <h3>Sales Orders</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Customer</th>
-                  <th>Product</th>
-                  <th>Qty</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sales.map((sale) => (
-                  <tr key={sale.id}>
-                    <td>{sale.customer_name}</td>
-                    <td>{sale.product_name}</td>
-                    <td>{sale.quantity}</td>
-                    <td>{sale.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'purchase' && (
-        <div className="table-card full-width">
-          <h3>Purchase Orders</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Supplier</th>
-                <th>Product</th>
-                <th>Quantity</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {purchaseOrders.map((order) => (
-                <tr key={order.id}>
-                  <td>{order.supplier_name}</td>
-                  <td>{order.product_name}</td>
-                  <td>{order.quantity}</td>
-                  <td>{order.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {activeTab === 'production' && (
-        <section className="split-layout">
-          <div className="panel">
-            <h3>Create Production Plan</h3>
-            <form onSubmit={handleProductionSubmit} className="stack-form">
-              <label>
-                Product
-                <select value={productionForm.product_id} onChange={(e) => setProductionForm({ ...productionForm, product_id: e.target.value })}>
-                  <option value="">Select product</option>
-                  {products.map((product) => (
-                    <option key={product.id} value={product.id}>{product.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Planned Quantity
-                <input type="number" value={productionForm.planned_quantity} onChange={(e) => setProductionForm({ ...productionForm, planned_quantity: e.target.value })} />
-              </label>
-              <label>
-                Status
-                <select value={productionForm.status} onChange={(e) => setProductionForm({ ...productionForm, status: e.target.value })}>
-                  <option>Scheduled</option>
-                  <option>In Progress</option>
-                  <option>Completed</option>
-                </select>
-              </label>
-              <button type="submit">Create Work Order</button>
-            </form>
-          </div>
-
-          <div className="table-card">
-            <h3>Production Schedule</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Qty</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workOrders.map((order) => (
-                  <tr key={order.id}>
-                    <td>{order.product_name}</td>
-                    <td>{order.planned_quantity}</td>
-                    <td>{order.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'suppliers' && (
-        <section className="split-layout">
-          <div className="panel">
-            <h3>Add Supplier</h3>
-            <form onSubmit={handleSupplierSubmit} className="stack-form">
-              <label>
-                Supplier Name
-                <input value={supplierForm.name} onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })} />
-              </label>
-              <label>
-                Contact Name
-                <input value={supplierForm.contact_name} onChange={(e) => setSupplierForm({ ...supplierForm, contact_name: e.target.value })} />
-              </label>
-              <label>
-                Email
-                <input type="email" value={supplierForm.email} onChange={(e) => setSupplierForm({ ...supplierForm, email: e.target.value })} />
-              </label>
-              <label>
-                Phone
-                <input value={supplierForm.phone} onChange={(e) => setSupplierForm({ ...supplierForm, phone: e.target.value })} />
-              </label>
-              <button type="submit">Save Supplier</button>
-            </form>
-          </div>
-
-          <div className="table-card">
-            <h3>Suppliers</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Contact</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                </tr>
-              </thead>
-              <tbody>
-                {suppliers.map((supplier) => (
-                  <tr key={supplier.id}>
-                    <td>{supplier.name}</td>
-                    <td>{supplier.contact_name}</td>
-                    <td>{supplier.email}</td>
-                    <td>{supplier.phone}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'customers' && (
-        <section className="split-layout">
-          <div className="panel">
-            <h3>Add Customer</h3>
-            <form onSubmit={handleCustomerSubmit} className="stack-form">
-              <label>
-                Customer Name
-                <input value={customerForm.name} onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })} />
-              </label>
-              <label>
-                Contact Name
-                <input value={customerForm.contact_name} onChange={(e) => setCustomerForm({ ...customerForm, contact_name: e.target.value })} />
-              </label>
-              <label>
-                Email
-                <input type="email" value={customerForm.email} onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })} />
-              </label>
-              <label>
-                Phone
-                <input value={customerForm.phone} onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })} />
-              </label>
-              <button type="submit">Save Customer</button>
-            </form>
-          </div>
-
-          <div className="table-card">
-            <h3>Customers</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Contact</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                </tr>
-              </thead>
-              <tbody>
-                {customers.map((customer) => (
-                  <tr key={customer.id}>
-                    <td>{customer.name}</td>
-                    <td>{customer.contact_name}</td>
-                    <td>{customer.email}</td>
-                    <td>{customer.phone}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {activeTab === 'work' && (
-        <div className="table-card full-width">
-          <h3>Work Orders</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Planned Qty</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workOrders.map((order) => (
-                <tr key={order.id}>
-                  <td>{order.product_name}</td>
-                  <td>{order.planned_quantity}</td>
-                  <td>{order.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
+* {
+  box-sizing: border-box;
 }
 
-export default App;
+body {
+  margin: 0;
+  font-family: Inter, 'Segoe UI', sans-serif;
+  background: #f3f7fb;
+  color: #1d2433;
+}
+
+button, input, select {
+  font: inherit;
+}
+
+#root {
+  width: 100%;
+}
+
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #eaf2ff, #f7fafe);
+  padding: 20px;
+}
+
+.auth-card {
+  width: min(430px, 100%);
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 15px 40px rgba(17, 33, 80, 0.12);
+  padding: 32px 28px;
+}
+
+.auth-card h1 {
+  margin-top: 10px;
+  margin-bottom: 22px;
+}
+
+.auth-form {
+  display: grid;
+  gap: 16px;
+}
+
+.auth-form label,
+.stack-form label {
+  display: grid;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+input, select {
+  width: 100%;
+  border: 1px solid #d8e1ee;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+button {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  background: #2d5bff;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:hover {
+  opacity: 0.96;
+}
+
+.demo-box {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #edf4ff;
+  color: #244299;
+  font-size: 0.9rem;
+}
+
+.error-box {
+  margin-top: 16px;
+  background: #fff0f0;
+  border: 1px solid #ffd7d7;
+  color: #b42318;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #4f7cff;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+h1 {
+  margin: 8px 0 0;
+  font-size: 2.2rem;
+}
+
+.logout-btn {
+  background: #0f172a;
+  padding-inline: 18px;
+}
+
+.tab-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0 24px;
+}
+
+.tab {
+  background: #e8eefb;
+  color: #233a72;
+  font-weight: 700;
+}
+
+.tab.active {
+  background: #2d5bff;
+  color: white;
+}
+
+.stats-grid,
+.panel-grid,
+.table-section,
+.split-layout {
+  display: grid;
+  gap: 20px;
+}
+
+.stats-grid {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin-bottom: 24px;
+}
+
+.metric {
+  padding: 22px 18px;
+  background: linear-gradient(135deg, #1c2a6d, #2d5bff);
+  color: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(38, 66, 147, 0.2);
+}
+
+.metric span {
+  display: block;
+  opacity: 0.9;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.metric strong {
+  font-size: 2rem;
+}
+
+.card,
+.panel,
+.table-card {
+  background: white;
+  border: 1px solid #e4ebf5;
+  border-radius: 16px;
+  box-shadow: 0 10px 22px rgba(16, 32, 67, 0.04);
+}
+
+.panel, .table-card {
+  padding: 20px;
+}
+
+.panel-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  margin-bottom: 24px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid #edf2f7;
+  font-size: 0.95rem;
+}
+
+th {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.list li {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid #edf2f7;
+  padding-bottom: 8px;
+}
+
+.split-layout {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.stack-form {
+  display: grid;
+  gap: 14px;
+}
+
+.full-width {
+  width: 100%;
+}
